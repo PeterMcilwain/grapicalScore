@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: #f0f0f0;
+        }
+    </style>
+</head>
+
+<body>
+    <script>
+        let points = 50;
+        let xSpace;
+        let line = [];
+        let lines = [];
+        let dots = [];
+        let offset = 0;
+        let drawingHeight;
+        let leftMargin = 50;
+        let drawingWidth;
+        let phrases = [
+            "sleepy",
+            "head full of birds",
+            "blindfolded",
+            "they don't know",
+            "the sky like a blanket",
+            "slow floating",
+            "near miss shock",
+            "distraction",
+            "why move?",
+            "control sometimes",
+            "got the day wrong",
+            "long soft shadows",
+            "stark sun summer",
+            "in liquid",
+            "don't know why",
+            "wrong in the right way",
+            "not like before",
+            "its all for you",
+            "carefully",
+            "before it hit",
+            "still waiting",
+            "stop stopping",
+            "here + somewhere else",
+            "speck drifts in room",
+            "a bit too close",
+        ];
+        let currentPhrase;
+        let phraseCount = 0;
+        let nextPromptAt = 0;
+        let intervals = [1, 2, 3, 4, 5];
+        let showPrompt = false;
+        let miniatureOffset = 1; // Track position within current miniature
+        let bgColor;
+        let lineColor;
+        let dotColor;
+        let phraseColor;
+        let numColor;
+
+        function setup() {
+            createCanvas(844, 390);
+            drawingHeight = height - 80;
+            drawingWidth = width - leftMargin;
+            xSpace = drawingWidth / points;
+
+            // Initialize colors
+            bgColor = color(255);
+            lineColor = color(0);
+            dotColor = color(0);
+            phraseColor = color(0);
+            numColor = color(0);
+
+            background(bgColor);
+            strokeCap(SQUARE);
+            noiseDetail(4, .75);
+
+            // Initialize intervals and prompts
+            intervals = shuffle(intervals);
+            phrases = shuffle(phrases);
+            currentPhrase = phrases[0];
+            showPrompt = true; // First screen shows prompt
+
+            makeLine(offset);
+            makeDots(offset);
+            drawLine();
+            drawDots();
+            drawPhrase();
+            drawNum(offset);
+        }
+
+        function drawLine() {
+            for (let i = 0; i < lines.length; i++) {
+                let w = noise(lines[i][0][0] * 0.5, lines[i][0][0] * 0.5);
+                let strokeW = 1 + (w * w * 20);
+
+                if (random() < 0.4) {
+                    drawDash(lines[i], strokeW, 10, 8);
+                } else {
+                    noFill();
+                    stroke(lineColor);
+                    strokeWeight(strokeW);
+                    beginShape();
+                    for (let j = 0; j < lines[i][0].length; j++) {
+                        curveVertex(lines[i][0][j], lines[i][1][j]);
+                    }
+                    endShape();
+                }
+            }
+
+            // Draw circle when prompt shows
+            if (showPrompt) {
+                fill(bgColor);
+                stroke(lineColor);
+                strokeWeight(8);
+                circle(lines[0][0][0], lines[0][1][0], 50);
+            }
+        }
+
+        function drawDash(segment, strokeW, dashLen, gapLen) {
+            fill(lineColor);
+            noStroke();
+
+            let accumulated = 0;
+            let drawing = true;
+
+            for (let i = 0; i < segment[0].length - 1; i++) {
+                let x1 = segment[0][i];
+                let y1 = segment[1][i];
+                let x2 = segment[0][i + 1];
+                let y2 = segment[1][i + 1];
+
+                let segLen = dist(x1, y1, x2, y2);
+                let angle = atan2(y2 - y1, x2 - x1);
+
+                let walked = 0;
+
+                while (walked < segLen) {
+                    let remaining = segLen - walked;
+                    let currentLen = drawing ? dashLen : gapLen;
+                    let stepLen = min(currentLen - accumulated, remaining);
+
+                    if (drawing) {
+                        let startX = x1 + cos(angle) * walked;
+                        let startY = y1 + sin(angle) * walked;
+
+                        push();
+                        translate(startX + cos(angle) * stepLen / 2, startY + sin(angle) * stepLen / 2);
+                        rotate(angle);
+                        rect(-stepLen / 2, -strokeW / 2, stepLen, strokeW);
+                        pop();
+                    }
+
+                    walked += stepLen;
+                    accumulated += stepLen;
+
+                    if (accumulated >= (drawing ? dashLen : gapLen)) {
+                        drawing = !drawing;
+                        accumulated = 0;
+                    }
+                }
+            }
+        }
+
+        function drawDots() {
+            fill(dotColor);
+            noStroke();
+            for (let i = 0; i < dots[0].length; i++) {
+                circle(dots[0][i], dots[1][i], dots[2][i] * 2);
+            }
+        }
+
+        function drawPhrase() {
+            // Only show phrase when prompt shows
+            if (showPrompt) {
+                fill(phraseColor);
+                textFont('Arial');
+                noStroke();
+                textSize(20);
+                textAlign(RIGHT, CENTER);
+
+                let margin = 100;
+                let y = height - 15;
+                let endX = width - 10;
+                let totalWidth = endX - margin;
+                let spacing = totalWidth / (currentPhrase.length - 1);
+
+                for (let i = 0; i < currentPhrase.length; i++) {
+                    let x = margin + (i * spacing);
+                    text(currentPhrase[i], x, y);
+                }
+            }
+        }
+
+        function drawNum(offset) {
+            fill(phraseColor);
+            textFont('Arial Bold');
+            noStroke();
+            textSize(20);
+            textAlign(LEFT, CENTER);
+            text(offset, 10, height - 15);
+        }
+
+        function makeLine(offset) {
+            lines = [];
+            line = [[], []];
+            let noiseOffset = offset * points * 0.01;
+            let segCount = -1;
+            for (let i = 0; i < points; i++) {
+                if (noise(offset, i * 0.1) < .5) {
+                    segCount++;
+                    lines[segCount] = [[], []];
+                }
+                if (segCount >= 0) {
+                    lines[segCount][0].push(leftMargin + i * xSpace);
+                    lines[segCount][1].push(noise(noiseOffset + (i * 0.01)) * drawingHeight);
+                }
+                line[0][i] = leftMargin + i * xSpace;
+                line[1][i] = noise(noiseOffset + (i * 0.01)) * drawingHeight;
+            }
+        }
+
+        function makeDots(offset) {
+            dots = [[], [], []];
+            let dn = noise(0, offset * .1, offset * .2);
+            let numDots = floor(dn * dn * dn * 9);
+            let dex = [];
+            for (let i = 0; i < points; i++) {
+                dex[i] = i;
+            }
+            dex = shuffle(dex);
+
+            let dotCount = 0;
+            for (let i = 0; i < numDots; i++) {
+                let attempts = 0;
+                let validDot = false;
+
+                while (!validDot && attempts < 100) {
+                    let r = random() * random();
+                    let radius = 5 + (r * 95);
+                    let x = line[0][dex[i]];
+                    let y = noise(offset, 0, dex[i] * .5) * drawingHeight;
+
+                    if (y - radius < 0) y = radius;
+                    if (y + radius > drawingHeight) y = drawingHeight - radius;
+                    if (x - radius < leftMargin) x = leftMargin + radius;
+                    if (x + radius > width) x = width - radius;
+
+                    if (checkDistanceToLine(x, y, radius * 2) && checkDistanceToOtherDots(x, y, radius, dotCount)) {
+                        validDot = true;
+                        dots[0][dotCount] = x;
+                        dots[1][dotCount] = y;
+                        dots[2][dotCount] = radius;
+                        dotCount++;
+                    }
+                    attempts++;
+                }
+            }
+        }
+
+        function checkDistanceToLine(x, y, diameter) {
+            for (let seg = 0; seg < lines.length; seg++) {
+                for (let i = 0; i < lines[seg][0].length; i++) {
+                    let dx = lines[seg][0][i] - x;
+                    let dy = lines[seg][1][i] - y;
+                    let distance = sqrt(dx * dx + dy * dy);
+                    if (distance < diameter) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        function checkDistanceToOtherDots(x, y, radius, currentIndex) {
+            for (let i = 0; i < currentIndex; i++) {
+                let dx = dots[0][i] - x;
+                let dy = dots[1][i] - y;
+                let distance = sqrt(dx * dx + dy * dy);
+                if (distance < radius + dots[2][i]) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        function mousePressed() {
+            if (mouseX < width / 2) {
+                offset -= 1;
+            } else {
+                offset += 1;
+            }
+
+            // Check if we should show a prompt at this offset
+            if (offset >= nextPromptAt) {
+                showPrompt = true;
+
+                // Get next interval
+                let interval = intervals.shift();
+                intervals.push(interval);
+                intervals = shuffle(intervals);
+                nextPromptAt = offset + interval;
+
+                // Update phrase
+                phraseCount++;
+                if (phraseCount >= phrases.length * 0.6) {
+                    phraseCount = 0;
+                    phrases = shuffle(phrases);
+                }
+                currentPhrase = phrases[phraseCount % phrases.length];
+            } else {
+                showPrompt = false;
+            }
+
+            makeLine(offset);
+            makeDots(offset);
+            background(bgColor);
+            drawDots();
+            drawNum(offset);
+            drawLine();
+            drawPhrase();
+        }
+
+        function keyPressed() {
+            if (key === 'f' || key === 'F') {
+                let fs = fullscreen();
+                fullscreen(!fs);
+            }
+        }
+    </script>
+</body>
+
+</html>
